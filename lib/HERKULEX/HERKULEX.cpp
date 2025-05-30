@@ -22,6 +22,9 @@ bool toggle = false;           // Booléen pour alterner entre deux positions
 // Variables pour la position du servo
 int pos, pos_angle;
 
+void All__Herkulex_LED(void){
+  my_servo.setLedColor(HerkulexLed::White);
+}
 void init_serial_1_for_herkulex()
 {
   Serial1.setRx(PIN_SW_RX); // Associe la broche RX à l'UART1

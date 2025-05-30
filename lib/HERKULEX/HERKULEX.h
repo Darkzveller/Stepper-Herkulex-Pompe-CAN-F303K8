@@ -31,6 +31,7 @@
 
 
 
+void All__Herkulex_LED(void);
 void init_serial_1_for_herkulex();
 void test_herkulex();
 void test_connexion();

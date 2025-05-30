@@ -81,13 +81,16 @@ bool msg_for_me(int id_msg_rx){
     if(id_msg_rx == LACHER){
         return 1;
     }
-    if(id_msg_rx == CONSTRUIRE_AVANT_PREPARER){
+    if(id_msg_rx == CONSTRUIRE_PREPARER){
         return 1;
     }
     if(id_msg_rx == CONSTRUIRE_2ETAGE){
         return 1;
     }
     if(id_msg_rx == CONSTRUIRE_AVANT_TERMINEE){
+        return 1;
+    }
+    if(id_msg_rx == RESTART_CARTE_MPP){
         return 1;
     }
 

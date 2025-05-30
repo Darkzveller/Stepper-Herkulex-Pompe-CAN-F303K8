@@ -7,6 +7,7 @@
 // offset pour différencier les deux cartes MPP, avant, ou arrière
 
 #define PIN_POMPE PF0 // Pin pour la pompe
+static int thing;
 
 SemaphoreHandle_t mutex = NULL;        // handle du mutex
 TaskHandle_t build_handle = nullptr;   // handle de la contruction
@@ -32,28 +33,24 @@ void setup()
 {
     Serial.begin(115200);
     Serial.println("Serial.begin");
-    delay(100);
     initStepper();
     Serial.println("initStepper()");
 
     init_serial_1_for_herkulex();
-    delay(100);
     Serial.println("init_serial_1_for_herkulex");
 
     setup_can();
-    delay(100);
     Serial.println("setup_can");
     delay(100);
 
     pinMode(PIN_POMPE, OUTPUT);
 
-    mutex = xSemaphoreCreateMutex(); // cree le mutex
+    // mutex = xSemaphoreCreateMutex(); // cree le mutex
     xTaskCreate(Gestion_STEPPER, "Gestion_STEPPER", configMINIMAL_STACK_SIZE, NULL, 2, &stepper_handle);
     xTaskCreate(Gestion_CAN, "Gestion_CAN", configMINIMAL_STACK_SIZE, NULL, 1, NULL);
     xTaskCreate(build_floor2, "bluid_floor2", configMINIMAL_STACK_SIZE, NULL, 2, &build_handle);
     // xTaskCreate(task_interrupt_stepper, "task_interrupt_stepper", configMINIMAL_STACK_SIZE, NULL, 3, &stepper_handle);
     // check for creation errors
-
     // start scheduler
     sendCANMessage(BOOT_CARTE_MPP, 1, 0, 0, 0, 0, 0, 0, 0); // signale que la carte a boot, pret à recevoir des ordres
     vTaskStartScheduler();                                  // lance le scheduler
@@ -67,6 +64,7 @@ void setup()
 
 void loop()
 {
+    Serial.println("test");
     // loop vide
     // static bool aspire = false;
 
@@ -109,95 +107,98 @@ void Gestion_CAN(void *parametres)
 
     while (1)
     {
-
-        // prend le mutex avant d'utiliser les periphériques séries
-        if (xSemaphoreTake(mutex, (TickType_t)5) == pdTRUE)
+        // regarde si on a un msg can pour nous
+        if (receiveCANMessage(&id_msg_can_rx, data_msg_can_rx))
         {
-            // regarde si on a un msg can pour nous
-            if (receiveCANMessage(&id_msg_can_rx, data_msg_can_rx))
+            Serial.print("msg recu 0x");
+            Serial.println(id_msg_can_rx, HEX);
+            switch (id_msg_can_rx)
             {
-                Serial.print("msg recu 0x");
-                Serial.println(id_msg_can_rx, HEX);
-                switch (id_msg_can_rx)
+            case HERKULEX_AIMANT_CENTRE:
+                cmd_aimant_centre(data_msg_can_rx[0]); // met le mouvement demandé
+                break;
+            case HERKULEX_AIMANT_COTE:
+                cmd_aimant_cote(data_msg_can_rx[0]); // met le mouvement demandé
+                break;
+            case HERKULEX_PIVOT_COTE:
+                // met le mouvement demandé par la trame
+                restart_all_servo();
+                if (data_msg_can_rx[0] == CENTRE)
                 {
-                case HERKULEX_AIMANT_CENTRE:
-                    cmd_aimant_centre(data_msg_can_rx[0]); // met le mouvement demandé
-                    break;
-                case HERKULEX_AIMANT_COTE:
-                    cmd_aimant_cote(data_msg_can_rx[0]); // met le mouvement demandé
-                    break;
-                case HERKULEX_PIVOT_COTE:
-                    // met le mouvement demandé par la trame
-                    if (data_msg_can_rx[0] == CENTRE)
-                    {
-                        aimant_cote_centre();
-                    }
-                    else if (data_msg_can_rx[0] == COTE)
-                    {
-                        aimant_cote_attraper();
-                    }
-                    else if (data_msg_can_rx[0] == ECARTER)
-                    {
-                        aimant_cote_ecarter();
-                    }
-                    break;
-                case CMD_MPP:
-                    // nbre de pas codé sur les 4 premiers octet de la trame
-                    nb_step = *((int *)&data_msg_can_rx);
-                    // mode de fdc sur l'octet de 4
-                    mode_fdc = data_msg_can_rx[4];
-                    xTaskNotifyGive(stepper_handle); // on lance la tâche
-                    Serial.println(nb_step);
-                    break;
-                case HERKULEX_PIVOT_POMPE:
-                    cmd_pivot_pompe(data_msg_can_rx[0]);
-                    break;
-                case LACHER:
-                    // cmd_pince(data_msg_can_rx[0]);
-                    break;
-                case CONTRUIRE_PREPARER:
-                    restart_all_servo();
-                    cmd_pivot_pompe(RETRACTER); // déploit pivot pince
-                    aimant_cote_attraper();     // pivots des côtés
-                    // met à la pos pour attraper les cannetes
-                    cmd_aimant_centre(ATTRAPER);
-                    cmd_aimant_cote(ATTRAPER);
-                    cmd_pompe(false);
-                    break;
-                case CONSTRUIRE_2ETAGE:
-                    /*
-                        L'avantage de cette méthode c'est qu'on bouffe rien
-                        En gros -> pas de mutex rien
-                        On fait en quelque sorte une interruption tâche
-                    */
-                    xTaskNotifyGive(build_handle); // on lance la tâche
-                    break;
-                default:
-                    break;
+                    aimant_cote_centre();
                 }
-            }
-
-            if (Serial.available() > 0)
-            {
-                char c = Serial.read();
-
-                if (c == 's')
+                else if (data_msg_can_rx[0] == COTE)
                 {
-                    Serial.println("Scanning...");
-                    Serial.println("Addresses are displayed in hexadecimal");
-                    activate_detect = true;
+                    aimant_cote_attraper();
                 }
-            }
+                else if (data_msg_can_rx[0] == ECARTER)
+                {
+                    aimant_cote_ecarter();
+                }
+                break;
+            case CMD_MPP:
+                // Pour le test
+                // nbre de pas codé sur les 4 premiers octet de la trame
+                nb_step = *((int *)&data_msg_can_rx);
+                // mode de fdc sur l'octet de 4
+                mode_fdc = data_msg_can_rx[4];
+                // xTaskNotifyGive(stepper_handle); // on lance la tâche
+                flag_stepper == 1;
+                Serial.println(nb_step);
+                break;
+            case HERKULEX_PIVOT_POMPE:
+                restart_all_servo();
+                cmd_pivot_pompe(data_msg_can_rx[0]);
+                break;
+            case LACHER:
+                // cmd_pince(data_msg_can_rx[0]);
+                break;
+            case CONSTRUIRE_PREPARER:
+                Serial.printf("Preparer\n");
+                restart_all_servo();
+                cmd_pivot_pompe(RETRACTER); // déploit pivot pince
+                aimant_cote_attraper();     // pivots des côtés
+                // met à la pos pour attraper les cannetes
+                cmd_aimant_centre(ATTRAPER);
+                cmd_aimant_cote(ATTRAPER);
+                cmd_pompe(false);
+                break;
+            case CONSTRUIRE_2ETAGE:
+                /*
+                    L'avantage de cette méthode c'est qu'on bouffe rien
+                    En gros -> pas de mutex rien
+                    On fait en quelque sorte une interruption tâche
+                */
+                xTaskNotifyGive(build_handle); // on lance la tâche
+                break;
+            case RESTART_CARTE_MPP:
+                // NVIC_SystemReset();
+                break;
 
-            if (detect_id(activate_detect) == 253)
-            {
-                Serial.println("jsp = 0");
-                activate_detect = false;
+            default:
+                break;
             }
-            xSemaphoreGive(mutex); // rend le mutex
         }
-        vTaskDelay(pdMS_TO_TICKS(5)); // tache périodique de 5 ms
+
+        if (Serial.available() > 0)
+        {
+            char c = Serial.read();
+
+            if (c == 's')
+            {
+                Serial.println("Scanning...");
+                Serial.println("Addresses are displayed in hexadecimal");
+                activate_detect = true;
+            }
+        }
+
+        if (detect_id(activate_detect) == 253)
+        {
+            Serial.println("jsp = 0");
+            activate_detect = false;
+        }
     }
+    vTaskDelay(pdMS_TO_TICKS(5)); // tache périodique de 5 ms
 }
 
 // tache qui actionne le pas à pas
@@ -205,11 +206,14 @@ void Gestion_STEPPER(void *parametres) // v1
 {
     while (1)
     {
-        /*On bloque constamment le moteur pas a pas et on*/ 
-        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
-        stepper(nb_step, PAS_COMPLET, mode_fdc);
-        blockStepper();
-        flag_stepper = 0;
+        if (flag_stepper == 1)
+        {
+            Serial.println("Stepper");
+            /*On bloque constamment le moteur pas a pas et on*/
+            stepper(nb_step, PAS_COMPLET, mode_fdc);
+            blockStepper();
+            flag_stepper = 0;
+        }
     }
 }
 
@@ -271,13 +275,14 @@ void build_floor2(void *)
 
             case 0: // pas besoin de default comme on commence qu'une fois réveillé
                 // attrape la planche et ecarte les aimants pour monter plus tard
+                restart_all_servo();
                 cmd_pivot_pompe(DEPLOYER);
                 cmd_pompe(ATTRAPER);
                 aimant_cote_ecarter();
                 step_2_build = 1;
                 break;
             case 1:
-                // monte le MPP après 1 sec
+                // monte le MPP après 0.8 sec
                 if ((now - last_update) > 800)
                 {
                     restart_all_servo();
@@ -303,7 +308,7 @@ void build_floor2(void *)
                 }
                 break;
             case 3:
-                // Attend 2 secondes
+                // Attend 1.2 secondes
                 /*Lance la commande permettant de redescendre la planche du haut*/
 
                 if (now - last_update > 1200)
