@@ -81,13 +81,13 @@ bool msg_for_me(int id_msg_rx){
     if(id_msg_rx == HERKULEX_PINCE){
         return 1;
     }
-    if(id_msg_rx == CONSTRUIRE_AVANT_PREPARER){
+    if(id_msg_rx == CONSTRUIRE_TERMINEE){
         return 1;
     }
     if(id_msg_rx == CONSTRUIRE_2ETAGE){
         return 1;
     }
-    if(id_msg_rx == CONSTRUIRE_AVANT_TERMINEE){
+    if(id_msg_rx == CONTRUIRE_PREPARER){
         return 1;
     }
 

@@ -2,6 +2,7 @@
 #include "HERKULEX.h"
 #include <STM32FreeRTOS.h>
 
+#define SPEED_HERKULEX 200
 HardwareSerial Serial1(USART1);
 HerkulexServoBus herkulex_bus(Serial1);
 // Initialisation de la liaison série matérielle sur l'UART1
@@ -28,6 +29,7 @@ void init_serial_1_for_herkulex()
   Serial1.setTx(PIN_SW_TX); // Associe la broche TX à l'UART1
   Serial1.begin(115200);    // Initialise la communication série à 115200 bauds
   my_servo.setTorqueOn();   // Active le couple du servo (mise sous tension)
+  bus_update_herkulex();
 }
 
 void test_herkulex()
@@ -49,7 +51,7 @@ void test_herkulex()
       // Déplace le servo à -90° en 50 cycles, allume la LED verte
       // 512 - 90°/0.325 = 235
       // my_servo.reboot();
-      my_servo.setPosition(512 - 0 / 0.325, 50, HerkulexLed::Green);
+      my_servo.setPosition(512 - 0 / 0.325, SPEED_HERKULEX, HerkulexLed::Green);
       // Possibilité d'ajouter d'autres servos avec différentes positions
       // my_servo_2.setPosition(512-10/0.325, 50, HerkulexLed::Blue);
       // my_servo_3.setPosition(512+30/0.325, 50, HerkulexLed::Yellow);
@@ -59,7 +61,7 @@ void test_herkulex()
       // Déplace le servo à +45° en 50 cycles, allume la LED bleue
       // 512 + (45° / 0.325) = 650
       // 512 + 90°/0.325 = 789
-      my_servo.setPosition(512 + 90 / 0.325, 100, HerkulexLed::Blue);
+      my_servo.setPosition(512 + 90 / 0.325, SPEED_HERKULEX, HerkulexLed::Blue);
       my_servo.setTorqueOn();
       // my_servo_2.setPosition(512+10/0.325, 50, HerkulexLed::Blue);
       // my_servo_3.setPosition(512-30/0.325, 50, HerkulexLed::Yellow);
@@ -132,11 +134,15 @@ void aimant_cote_centre(void)
   // prepare le mouvement synchro
   herkulex_bus.prepareSynchronizedMove(50);
 
-  Pivot_gauche.setPosition(512 + ANGLE_PIVOT_COTE_CENTRE / 0.325, 50, HerkulexLed::Blue); // +90 pour mettre au centre
-  Pivot_droit.setPosition(512 - ANGLE_PIVOT_COTE_CENTRE / 0.325, 50, HerkulexLed::Blue);  // -90 pour mettre au centre
+  Pivot_gauche.setPosition(512 + ANGLE_PIVOT_COTE_CENTRE / 0.325, SPEED_HERKULEX, HerkulexLed::Blue); // +90 pour mettre au centre
+  Pivot_droit.setPosition(512 - ANGLE_PIVOT_COTE_CENTRE / 0.325, SPEED_HERKULEX, HerkulexLed::Blue);  // -90 pour mettre au centre
 
   // execute le mouvement
   herkulex_bus.executeMove();
+
+  bus_update_herkulex();
+
+  
 }
 
 void aimant_cote_attraper(void)
@@ -145,10 +151,15 @@ void aimant_cote_attraper(void)
   Pivot_gauche.setTorqueOn();
   Pivot_droit.setTorqueOn();
   // prepare le mouvement synchroX
+  herkulex_bus.prepareSynchronizedMove(SPEED_HERKULEX);
 
-  Pivot_gauche.setPosition(512 + ANGLE_PIVOT_COTE_ATTRAPER / 0.325, 50, HerkulexLed::Green); // 0° pour poser
-  Pivot_droit.setPosition(512 - ANGLE_PIVOT_COTE_ATTRAPER / 0.325, 50, HerkulexLed::Green);  // +90 pour poser
+  Pivot_gauche.setPosition(512 + ANGLE_PIVOT_COTE_ATTRAPER / 0.325, SPEED_HERKULEX, HerkulexLed::Green); // 0° pour poser
+  Pivot_droit.setPosition(512 - ANGLE_PIVOT_COTE_ATTRAPER / 0.325, SPEED_HERKULEX, HerkulexLed::Green);  // +90 pour poser
   // execute le mouvementX
+  herkulex_bus.executeMove();
+
+  bus_update_herkulex();
+
 }
 
 void aimant_cote_ecarter(void)
@@ -157,9 +168,11 @@ void aimant_cote_ecarter(void)
   Pivot_gauche.setTorqueOn();
   Pivot_droit.setTorqueOn();
   // prepare le mouvement synchro
+  // Pivot_droit.setBrake();
+  // Pivot_gauche.setBrake();
 
-  Pivot_gauche.setPosition(512 + ANGLE_PIVOT_COTE_ECARTER / 0.325, 50, HerkulexLed::Yellow); // -90° pour ecarter
-  Pivot_droit.setPosition(512 - ANGLE_PIVOT_COTE_ECARTER / 0.325, 50, HerkulexLed::Yellow);  // +90 pour ecarter
+  Pivot_gauche.setPosition(512 + ANGLE_PIVOT_COTE_ECARTER / 0.325, SPEED_HERKULEX, HerkulexLed::Yellow); // -90° pour ecarter
+  Pivot_droit.setPosition(512 - ANGLE_PIVOT_COTE_ECARTER / 0.325, SPEED_HERKULEX, HerkulexLed::Yellow);  // +90 pour ecarter
   // execute le mouvement
 }
 
@@ -168,12 +181,12 @@ void cmd_aimant_centre(bool mouvement)
   if (mouvement == RETIRER)
   {
     Aimant_centre.setTorqueOn();
-    Aimant_centre.setPosition(512 + 45 / 0.325, 50);
+    Aimant_centre.setPosition(512 + 45 / 0.325, SPEED_HERKULEX);
   }
   if (mouvement == ATTRAPER)
   {
     Aimant_centre.setTorqueOn();
-    Aimant_centre.setPosition(512 + 0 / 0.325, 50);
+    Aimant_centre.setPosition(512 + 0 / 0.325, SPEED_HERKULEX);
   }
 }
 
@@ -184,13 +197,13 @@ void cmd_aimant_cote(char mouvement)
 
   if (mouvement == ATTRAPER)
   {
-    Aimant_droit.setPosition(512 + 0, 50);
-    Aimant_gauche.setPosition(512 + 0, 50);
+    Aimant_droit.setPosition(512 + 0, SPEED_HERKULEX);
+    Aimant_gauche.setPosition(512 + 0, SPEED_HERKULEX);
   }
   if (mouvement == RETIRER)
   {
-    Aimant_droit.setPosition(512 + 45 / 0.325, 50);
-    Aimant_gauche.setPosition(512 + -45 / 0.325, 50);
+    Aimant_droit.setPosition(512 + 45 / 0.325, SPEED_HERKULEX);
+    Aimant_gauche.setPosition(512 + -45 / 0.325, SPEED_HERKULEX);
   }
 }
 
@@ -199,11 +212,11 @@ void cmd_pivot_pompe(char mouvement)
   Pivot_pince.setTorqueOn();
   if (mouvement == DEPLOYER)
   {
-    Pivot_pince.setPosition(512 + 10 / 0.325, 50); // angle final de 100
+    Pivot_pince.setPosition(512 + 5 / 0.325, SPEED_HERKULEX); // angle final de 100
   }
   if (mouvement == RETRACTER)
   {
-    Pivot_pince.setPosition(512 - 90 / 0.325, 50); // angle final de -90
+    Pivot_pince.setPosition(512 - 90 / 0.325, SPEED_HERKULEX); // angle final de -90
   }
 }
 
@@ -212,11 +225,11 @@ void cmd_pince(bool mouvement)
   Pince.setTorqueOn();
   if (mouvement == ATTRAPER)
   {
-    Pince.setPosition(512 + ANGLE_PINCE_ATTRAPER / 0.325, 100);
+    Pince.setPosition(512 + ANGLE_PINCE_ATTRAPER / 0.325, SPEED_HERKULEX);
   }
   if (mouvement == RETIRER)
   {
-    Pince.setPosition(512 + ANGLE_PINCE_LACHER / 0.325, 100);
+    Pince.setPosition(512 + ANGLE_PINCE_LACHER / 0.325, SPEED_HERKULEX);
   }
 }
 
@@ -276,4 +289,24 @@ void get_all_servo_pos(
 void restart_all_servo(void){
   my_servo.reboot();
   vTaskDelay(pdMS_TO_TICKS(225));
+}
+
+void set_torque_all_on(){
+my_servo.setTorqueOn();
+Aimant_centre.setTorqueOn();
+Aimant_gauche.setTorqueOn();
+Aimant_droit.setTorqueOn();
+Pivot_gauche.setTorqueOn();
+Pivot_droit.setTorqueOn();
+Pivot_pince.setTorqueOn();
+Pince.setTorqueOn();
+
+
+
+}
+
+void bus_update_herkulex(){
+
+      herkulex_bus.update(); // Met à jour les servos sur le bus
+
 }

@@ -28,8 +28,9 @@
 #define ANGLE_PIVOT_COTE_CENTRE -113
 
 
+void set_torque_all_on();
 
-
+void bus_update_herkulex();
 
 void init_serial_1_for_herkulex();
 void test_herkulex();
